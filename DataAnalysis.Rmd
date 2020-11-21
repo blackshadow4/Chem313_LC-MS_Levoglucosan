@@ -1,0 +1,146 @@
+---
+title: "Week2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+
+```{r}
+library(lattice)
+library(plyr)
+library(outliers)
+library(SDMTools)
+library(stats)
+library(gplots)
+```
+
+
+
+```{r Calibration Plot}
+Lev_conc <- c(0.5, 1, 5, 10)
+PA_C1 <- c(35374, 102631, 900610, 1966852)
+PA_C2 <- c(16473, 65386, 843564 ,1971019)
+PA_C3 <- c(15578, 67536, 860087, 2028744)
+
+#-----------
+Lev_conc <- c(0.5, 1, 5, 10, 0.5, 1, 5, 10, 0.5, 1, 5, 10)
+PA_C123 <- c(35374, 102631, 900610, 1966852, 16473, 65386, 843564 ,1971019, 15578, 67536, 860087, 2028744)
+
+plot(Lev_conc, PA_C123, xlab="[Levoglucosan] (ug/mL)", ylab="Peak Area")
+fit <- lm(PA_C123 ~ Lev_conc)
+abline(fit)
+
+slope <- fit$coefficients[2]
+intercept <- fit$coefficients[1]
+slope_uncertanty <- sqrt(diag(vcov(fit)))[2]
+intercept_uncertanty <- sqrt(diag(vcov(fit)))[1]
+y_uncertanty <- sqrt(deviance(fit)/df.residual(fit))
+
+print("Slope:")
+print(slope)
+print("Slope uncertanty:")
+print(slope_uncertanty)
+print ("intercept:")
+print (intercept)
+print ("intercept uncertanty:")
+print(intercept_uncertanty)
+print("Residual standard error = stadard Diviation")
+print(y_uncertanty)
+```
+
+```{r calculate cencentration}
+#x=y-intercept/slope
+#Slope(m) = 208246.7 
+#Slope U = 3426.909
+#Intercept(b) = -119530
+#Intercept U = 19252.55 
+#Y U = 45277.04
+
+Key <- c("E1750", "E1750", "E1750", "E1950", "E1950", "E1950", "E2020", "E2020", "E2020", "W1750" ,"W1750", "W1750", "W1950", "W1950", "W1950", "W2020", "W2020", "W2020")
+PA <- c(600313, 607456, 599583, 520873 ,534728, 505938, 867530, 875934, 889234, 734897, 753936 ,782634, 639845, 655428, 587392, 1047832, 999420, 2004877)
+Field_data <- data.frame(Key, PA)
+
+for(Key in Field_data){
+  Lev_conc <- ((Field_data$PA-119530)/208246.7)
+  
+  #Uncertanties
+  Lev_conc_U <-sqrt(((19252.55)/(119530))^2 + (3426.909/208246.7)^2)*Lev_conc
+}
+
+Field_data["[Levoglucosan] (ug/mL)"] <- Lev_conc
+Field_data["Uncertanty"] <- Lev_conc_U
+
+Field_data
+```
+
+```{r (ug/mL) to (ug/m^3)}
+# 1(ug/mL) = 1,000,000(ug/m^3)
+
+#Add 1.00 mL HPLC-grade methanol (MeOH) 
+#Add 1.00 mL HPLC-grade water (H2O) using a pipette
+#Ignore :Sonicate sample in a water-filled beaker for 30 minutes.
+#Ignore :Transfer ~500 uL of solution to a PTFE sample vial. 
+#Ignore : Slowly insert the 0.45 um filter into the solvent-filled sample vial.
+
+#[Levoglucosan] (ug/mL) * 2mL = ug 
+ug1 <- c(Field_data$`[Levoglucosan] (ug/mL)`*2)
+#ug/ m^2
+#7x10 in^2 --> 1x1 in^2 = mesured only 1 70th of total mass <-assumes even covering
+#ug*70 -->  ug   -- scail up
+ug2 <- c(ug1*70)
+#(1m^3/h) * 24h -> 24m^3
+#ug/ m^3
+conc2 <- ug2/24
+
+Field_data["[Levoglucosan] (ug/m^3)"] <- conc2
+Field_data
+```
+
+IDK how to use this properly - Look at Cristina Gonzales's code for t-tests
+
+ttest <- function(mean1, mean2, sd1, sd2, n1, n2){
+  s_pooled <- sqrt(((sd1^2 * (n1 - 1)) + (sd2^2 *(n2-1)) ) / (n1 + n2 -2))
+  t <- (abs(mean1 - mean2) / s_pooled) * sqrt(((n1 * n2) / (n1 + n2)))
+  return(t)
+  }
+
+95% CI between year+locations
+```{r}
+Uncertanty2 <- ((Field_data$Uncertanty*2)*70)/24
+for (Uncertanty in Field_data){
+  CI = (qnorm(0.95)*Uncertanty2/sqrt(3))
+}
+
+CI
+Field_data["95% CI"] <- CI
+Field_data
+
+LocationWE <- c("E","E","E","E","E","E","E","E","E","W","W","W","W","W","W","W","W","W")
+Year <- c(1750, 1750, 1750, 1950, 1950, 1950, 2020, 2020, 2020, 1750, 1750, 1750, 1950, 1950, 1950, 2020, 2020, 2020)
+Sub_key <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18)
+ggplot(data=Field_data, aes(x=Sub_key, y=`[Levoglucosan] (ug/m^3)`, fill=Key)) + scale_fill_manual(values=c("#FF4545", "#FFA245", "#FFE345", "#61FF45", "#45ADFF", "#A245FF")) + geom_bar(stat="identity", position=position_dodge()) + geom_errorbar(aes(ymin=`[Levoglucosan] (ug/m^3)`-`95% CI`, ymax=`[Levoglucosan] (ug/m^3)`+`95% CI`), width=.2, position=position_dodge(0.9)) + labs(y="[Levoglucosan] (ug/m^3)", x=" ")
+```
+
